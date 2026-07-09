@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.choices import UserRole
 from core.models import BaseModel
-from .managers import UserManager
+from .managers import CustomUserManager
 
 
 class User(BaseModel, AbstractUser):

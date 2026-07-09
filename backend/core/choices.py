@@ -32,3 +32,14 @@ class FollowUpStatus(models.TextChoices):
     PENDING = "PENDING", _("Pending")
     COMPLETED = "COMPLETED", _("Completed")
     MISSED = "MISSED", _("Missed")
+
+
+
+class LeadSourceType(models.TextChoices):
+    WEBSITE = "WEBSITE", _("Website")
+    REFERRAL = "REFERRAL", _("Referral")
+    SOCIAL_MEDIA = "SOCIAL_MEDIA", _("Social Media")
+    EMAIL = "EMAIL", _("Email")
+    PHONE = "PHONE", _("Phone")
+    WALK_IN = "WALK_IN", _("Walk In")
+    OTHER = "OTHER", _("Other")
