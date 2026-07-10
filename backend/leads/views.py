@@ -1,6 +1,8 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
-
+from core.choices import UserRole
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
 from .models import Lead, LeadSource
 from .permissions import LeadPermission
 from .serializers import (
@@ -19,13 +21,12 @@ class LeadSourceViewSet(viewsets.ModelViewSet):
 
 class LeadViewSet(viewsets.ModelViewSet):
     queryset = (
-        Lead.objects
-        .select_related(
-            "source",
-            "assigned_to",
-            "created_by",
-        )
-        .all()
+    Lead.objects
+    .select_related(
+        "source",
+        "assigned_to",
+        "created_by",
+    )
     )
 
     serializer_class = LeadSerializer
@@ -61,3 +62,55 @@ class LeadViewSet(viewsets.ModelViewSet):
     ]
 
     ordering = ["-created_at"]
+
+
+    def get_permissions(self):
+        if self.action == "destroy":
+            if self.request.user.role not in (
+                UserRole.ADMIN,
+                UserRole.SALES_MANAGER,
+            ):
+                raise ValidationError(
+                    "You do not have permission to delete leads."
+                )
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        queryset = self.queryset
+
+        if user.role in (
+            UserRole.ADMIN,
+            UserRole.SALES_MANAGER,
+        ):
+            return queryset
+
+        return queryset.filter(
+            assigned_to=user,
+        )
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        if user.role == UserRole.SALES_EXECUTIVE:
+            serializer.save(
+                created_by=user,
+                assigned_to=user,
+            )
+            return
+
+        assigned_to = serializer.validated_data.get("assigned_to")
+
+        if assigned_to is None:
+            raise ValidationError(
+                {
+                    "assigned_to": (
+                        "Admin and Sales Manager must assign the lead "
+                        "to a Sales Executive."
+                    )
+            }
+        )
+
+        serializer.save(created_by=user)
+
