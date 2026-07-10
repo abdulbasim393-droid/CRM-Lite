@@ -2,9 +2,18 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
 from core.choices import UserRole
 
-from rest_framework.exceptions import PermissionDenied
+from django.db import transaction
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
 
-from rest_framework.exceptions import ValidationError
+from customers.models import Customer
+from customers.serializers import CustomerSerializer
+
+
+from rest_framework.exceptions import PermissionDenied, ValidationError
+
+
 from rest_framework.permissions import IsAuthenticated
 from .models import Lead, LeadSource
 from .permissions import LeadPermission
@@ -12,6 +21,14 @@ from .serializers import (
     LeadSerializer,
     LeadSourceSerializer,
 )
+
+
+
+
+from accounts.models import UserRole
+from leads.models import Lead, LeadNote
+from leads.serializers import LeadNoteSerializer
+
 
 
 class LeadSourceViewSet(viewsets.ModelViewSet):
@@ -124,13 +141,50 @@ class LeadViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
         
 
+    @action(
+    detail=True,
+    methods=["post"],
+    )
+    @transaction.atomic
+    def convert(self, request, pk=None):
+        lead = self.get_object()
 
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
+        if lead.status != LeadStatus.WON:
+            return Response(
+                {
+                    "detail": "Only leads with status 'WON' can be converted."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-from accounts.models import UserRole
-from leads.models import Lead, LeadNote
-from leads.serializers import LeadNoteSerializer
+        if Customer.objects.filter(lead=lead).exists():
+            return Response(
+                {
+                    "detail": "This lead has already been converted."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        customer = Customer.objects.create(
+            lead=lead,
+            first_name=lead.first_name,
+            last_name=lead.last_name,
+            phone=lead.phone,
+            email=lead.email,
+            company=lead.company,
+            created_by=request.user,
+        )
+
+        serializer = CustomerSerializer(
+                customer,
+            context={"request": request},
+        )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+        )
+
 
 
 class LeadNoteViewSet(viewsets.ModelViewSet):
