@@ -26,3 +26,28 @@ class LeadPermission(BasePermission):
             return obj.assigned_to == user
 
         return False
+
+
+class LeadNotePermission(BasePermission):
+    """
+    Role-based and object-level permissions for LeadNote operations.
+    """
+
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+
+        # Admin and Sales Manager can access every note.
+        if user.role in (
+            UserRole.ADMIN,
+            UserRole.SALES_MANAGER,
+        ):
+            return True
+
+        # Sales Executive can only access notes on their own assigned leads.
+        if user.role == UserRole.SALES_EXECUTIVE:
+            return obj.lead.assigned_to == user
+
+        return False

@@ -1,6 +1,9 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
 from core.choices import UserRole
+
+from rest_framework.exceptions import PermissionDenied
+
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from .models import Lead, LeadSource
@@ -64,21 +67,15 @@ class LeadViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
 
-    def get_permissions(self):
-        if self.action == "destroy":
-            if self.request.user.role not in (
-                UserRole.ADMIN,
-                UserRole.SALES_MANAGER,
-            ):
-                raise ValidationError(
-                    "You do not have permission to delete leads."
-                )
-        return [IsAuthenticated()]
+    
 
     def get_queryset(self):
         user = self.request.user
 
         queryset = self.queryset
+
+        if not user.is_authenticated:
+            return queryset.none()
 
         if user.role in (
             UserRole.ADMIN,
@@ -114,3 +111,64 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         serializer.save(created_by=user)
 
+
+    def get_permissions(self):
+        if self.action == "destroy" and self.request.user.is_authenticated:
+            if self.request.user.role not in (
+                UserRole.ADMIN,
+                UserRole.SALES_MANAGER,
+            ):
+                raise ValidationError(
+                    "You do not have permission to delete leads."
+                )
+        return [IsAuthenticated()]
+        
+
+
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+
+from accounts.models import UserRole
+from leads.models import Lead, LeadNote
+from leads.serializers import LeadNoteSerializer
+
+
+class LeadNoteViewSet(viewsets.ModelViewSet):
+    queryset = LeadNote.objects.none()
+    serializer_class = LeadNoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        queryset = LeadNote.objects.select_related(
+            "lead",
+            "created_by",
+        )
+
+        if not user.is_authenticated:
+            return queryset.none()
+
+        if user.role in (
+            UserRole.ADMIN,
+            UserRole.SALES_MANAGER,
+        ):
+            return queryset
+
+        return queryset.filter(
+            lead__assigned_to=user,
+        )
+
+    def perform_create(self, serializer):
+        lead = serializer.validated_data["lead"]
+        user = self.request.user
+
+        if (
+            user.role == UserRole.SALES_EXECUTIVE
+            and lead.assigned_to != user
+        ):
+            raise PermissionDenied(
+                "You can only add notes to your assigned leads."
+            )
+
+        serializer.save(created_by=user)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from core.choices import UserRole
-from .models import Lead, LeadSource
+from .models import Lead, LeadSource, LeadNote
 
 
 class LeadSourceSerializer(serializers.ModelSerializer):
@@ -100,3 +100,53 @@ class LeadSerializer(serializers.ModelSerializer):
         )
 
         return value   
+
+
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+
+        if request:
+            user = request.user
+
+            if user.role == user.Role.SALES_EXECUTIVE:
+                restricted_fields = ["assigned_to", "created_by"]
+
+                for field in restricted_fields:
+                    if field in validated_data:
+                        raise serializers.ValidationError(
+                            {
+                                field: "You are not allowed to modify this field."
+                            }
+                        )
+
+        return super().update(instance, validated_data)
+
+
+
+class LeadNoteSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LeadNote
+        fields = (
+            "id",
+            "lead",
+            "note_type",
+            "note_text",
+            "created_by",
+            "created_by_name",
+            "created_at",
+            "updated_at",
+        )
+
+        read_only_fields = (
+            "id",
+            "created_by",
+            "created_by_name",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() or obj.created_by.email

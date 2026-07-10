@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     LeadSourceViewSet,
     LeadViewSet,
+    LeadNoteViewSet,
 )
 
 router = DefaultRouter()
@@ -16,6 +17,11 @@ router.register(
 router.register(
     "leads",
     LeadViewSet,
+)
+
+router.register(
+    "lead-notes",
+    LeadNoteViewSet,
 )
 
 urlpatterns = [

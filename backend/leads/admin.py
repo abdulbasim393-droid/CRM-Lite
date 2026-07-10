@@ -3,6 +3,29 @@ from django.contrib import admin
 from .models import Lead, LeadSource
 
 
+from .models import LeadNote
+
+
+@admin.register(LeadNote)
+class LeadNoteAdmin(admin.ModelAdmin):
+    list_display = (
+        "lead",
+        "note_type",
+        "created_by",
+        "created_at",
+    )
+
+    list_filter = (
+        "note_type",
+        "created_at",
+    )
+
+    search_fields = (
+        "lead__first_name",
+        "lead__last_name",
+        "note_text",
+    )
+
 @admin.register(LeadSource)
 class LeadSourceAdmin(admin.ModelAdmin):
     list_display = ("name", "is_active", "created_at")
