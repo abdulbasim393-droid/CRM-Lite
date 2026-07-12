@@ -1,9 +1,9 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from accounts.models import UserRole
+from core.choices import UserRole
 from .models import FollowUp
-from leads.models import LeadStatus
+from core.choices import LeadStatus
 
 
 class FollowUpSerializer(serializers.ModelSerializer):

@@ -246,6 +246,19 @@ class LeadViewSet(viewsets.ModelViewSet):
             },
         )
 
+        log_activity(
+            entity_type=EntityType.CUSTOMER,
+            entity_id=customer.id,
+            action=ActionType.CREATED,
+            performed_by=request.user,
+            new_value={
+                "first_name": customer.first_name,
+                "last_name": customer.last_name,
+                "email": customer.email,
+                "company": customer.company,
+            },
+        )
+
         serializer = CustomerSerializer(
                 customer,
             context={"request": request},
@@ -308,3 +321,38 @@ class LeadNoteViewSet(viewsets.ModelViewSet):
                 "note_type": note.note_type,
             },
         )
+
+    def perform_update(self, serializer):
+        note = serializer.instance
+        old_note_type = note.note_type
+        old_note_text = note.note_text
+
+        note = serializer.save()
+
+        log_activity(
+            entity_type=EntityType.LEAD_NOTE,
+            entity_id=note.id,
+            action=ActionType.UPDATED,
+            performed_by=self.request.user,
+            old_value={
+                "note_type": old_note_type,
+                "note_text": old_note_text,
+            },
+            new_value={
+                "note_type": note.note_type,
+                "note_text": note.note_text,
+            },
+        )
+
+    def perform_destroy(self, instance):
+        log_activity(
+            entity_type=EntityType.LEAD_NOTE,
+            entity_id=instance.id,
+            action=ActionType.DELETED,
+            performed_by=self.request.user,
+            old_value={
+                "lead_id": str(instance.lead_id),
+                "note_type": instance.note_type,
+            },
+        )
+        instance.delete()

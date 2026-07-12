@@ -28,4 +28,8 @@ urlpatterns = [
     path("api/leads/", include("leads.urls")),
     path("api/auth/", include("accounts.urls")),
     path("api/activity/", include("activity.urls")),
+    path("api/customers/", include("customers.urls")),
+    path("api/followups/", include("followups.urls")),
+    path("api/dashboard/", include("dashboard.urls")),
+    path("api/reports/", include("reports.urls")),
 ]
