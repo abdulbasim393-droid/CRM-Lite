@@ -1,6 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
-from core.choices import UserRole
+from core.choices import LeadStatus, UserRole
 
 from django.db import transaction
 from rest_framework.decorators import action
@@ -15,7 +15,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 
 from rest_framework.permissions import IsAuthenticated
-from .models import Lead, LeadSource
+
 from .permissions import LeadPermission
 from .serializers import (
     LeadSerializer,
@@ -23,11 +23,22 @@ from .serializers import (
 )
 
 
+from .models import (
+    Lead,
+    LeadSource,
+    LeadNote,
+)
 
 
-from accounts.models import UserRole
-from leads.models import Lead, LeadNote
 from leads.serializers import LeadNoteSerializer
+
+
+from activity.services import log_activity
+from activity.models import (
+    ActivityLog,
+    EntityType,
+    ActionType,
+)
 
 
 
@@ -108,26 +119,75 @@ class LeadViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.role == UserRole.SALES_EXECUTIVE:
-            serializer.save(
+            lead = serializer.save(
                 created_by=user,
                 assigned_to=user,
-            )
-            return
+            )   
+        else:
+            assigned_to = serializer.validated_data.get("assigned_to")
 
-        assigned_to = serializer.validated_data.get("assigned_to")
+            if assigned_to is None:
+                raise ValidationError(
+                    {
+                        "assigned_to": (
+                            "Admin and Sales Manager must assign the lead "
+                            "to a Sales Executive."
+                        )
+                    }
+                )
 
-        if assigned_to is None:
-            raise ValidationError(
-                {
-                    "assigned_to": (
-                        "Admin and Sales Manager must assign the lead "
-                        "to a Sales Executive."
-                    )
-            }
+            lead = serializer.save(created_by=user)
+
+        log_activity(
+            entity_type=EntityType.LEAD,
+            entity_id=lead.id,
+            action=ActionType.CREATED,
+            performed_by=user,
+            new_value={
+                "status": lead.status,
+                "assigned_to": (
+                    lead.assigned_to.email
+                    if lead.assigned_to
+                    else None
+                ),
+            },
         )
 
-        serializer.save(created_by=user)
+    def perform_update(self, serializer):
+        lead = serializer.instance
+        old_status = lead.status
+        old_assigned_to = lead.assigned_to
 
+        lead = serializer.save()
+
+        log_activity(
+            entity_type=EntityType.LEAD,
+            entity_id=lead.id,
+            action=ActionType.UPDATED,
+            performed_by=self.request.user,
+            old_value={
+                "status": old_status,
+                "assigned_to": old_assigned_to.email if old_assigned_to else None,
+            },
+            new_value={
+                "status": lead.status,
+                "assigned_to": lead.assigned_to.email if lead.assigned_to else None,
+            },
+        )
+
+    def perform_destroy(self, instance):
+        log_activity(
+            entity_type=EntityType.LEAD,
+            entity_id=instance.id,
+            action=ActionType.DELETED,
+            performed_by=self.request.user,
+            old_value={
+                "first_name": instance.first_name,
+                "last_name": instance.last_name,
+                "email": instance.email,
+            },
+        )
+        instance.delete()
 
     def get_permissions(self):
         if self.action == "destroy" and self.request.user.is_authenticated:
@@ -173,6 +233,17 @@ class LeadViewSet(viewsets.ModelViewSet):
             email=lead.email,
             company=lead.company,
             created_by=request.user,
+        )
+
+        log_activity(
+            entity_type=EntityType.LEAD,
+            entity_id=lead.id,
+            action=ActionType.CONVERTED,
+            performed_by=request.user,
+            old_value={"status": LeadStatus.WON},
+            new_value={
+                "customer_id": str(customer.id),
+            },
         )
 
         serializer = CustomerSerializer(
@@ -225,4 +296,15 @@ class LeadNoteViewSet(viewsets.ModelViewSet):
                 "You can only add notes to your assigned leads."
             )
 
-        serializer.save(created_by=user)
+        note = serializer.save(created_by=user)
+
+        log_activity(
+            entity_type=EntityType.LEAD_NOTE,
+            entity_id=note.id,
+            action=ActionType.CREATED,
+            performed_by=user,
+            new_value={
+                "lead_id": str(lead.id),
+                "note_type": note.note_type,
+            },
+        )

@@ -1,7 +1,7 @@
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from accounts.models import UserRole
+from core.choices import UserRole
 from .models import Customer
 from .serializers import CustomerSerializer
 

@@ -109,7 +109,7 @@ class LeadSerializer(serializers.ModelSerializer):
         if request:
             user = request.user
 
-            if user.role == user.Role.SALES_EXECUTIVE:
+            if user.role == UserRole.SALES_EXECUTIVE:
                 restricted_fields = ["assigned_to", "created_by"]
 
                 for field in restricted_fields:

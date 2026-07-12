@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from accounts.models import UserRole
+from core.choices import UserRole
 from .models import FollowUp, FollowUpStatus
 from .serializers import FollowUpSerializer
 
