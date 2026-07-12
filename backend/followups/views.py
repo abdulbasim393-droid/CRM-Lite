@@ -121,8 +121,8 @@ class FollowUpViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         lead = serializer.validated_data["lead"]
-        assigned_to = serializer.validated_data["assigned_to"]
         user = self.request.user
+        assigned_to = serializer.validated_data.get("assigned_to") or user
 
         if (
             user.role == UserRole.SALES_EXECUTIVE

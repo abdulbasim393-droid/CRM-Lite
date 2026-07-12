@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Loader2, TrendingUp } from 'lucide-react';
 
@@ -107,6 +107,11 @@ export function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
+
+          <p className="mt-6 text-center text-sm text-gray-500">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">Create one</Link>
+          </p>
         </div>
       </div>
     </div>

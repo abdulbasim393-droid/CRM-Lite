@@ -33,6 +33,13 @@ class FollowUpSerializer(serializers.ModelSerializer):
             "assigned_to_name",
         )
 
+        extra_kwargs = {
+            "assigned_to": {
+                "required": False,
+                "allow_null": True,
+            },
+        }
+
     def get_assigned_to_name(self, obj):
         return obj.assigned_to.get_full_name() or obj.assigned_to.email
 
@@ -45,6 +52,8 @@ class FollowUpSerializer(serializers.ModelSerializer):
         return value
 
     def validate_assigned_to(self, value):
+        if value is None:
+            return value
         if value.role != UserRole.SALES_EXECUTIVE:
             raise serializers.ValidationError(
                 "Follow-up can only be assigned to a Sales Executive."

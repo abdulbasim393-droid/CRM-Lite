@@ -38,7 +38,7 @@ export function FollowUpsPage() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const handleCreate = async () => {
-    await followupsApi.create(formData);
+    await followupsApi.create({ ...formData, assigned_to: formData.assigned_to || user?.id });
     setShowCreate(false);
     setFormData({});
     fetch();
@@ -119,8 +119,10 @@ export function FollowUpsPage() {
             </select>
           </div>
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To (User ID)</label>
-            <input className="input-field" value={formData.assigned_to || ''} onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })} />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+            <p className="text-sm text-gray-700 py-2.5 px-3.5 bg-gray-50 border border-gray-200 rounded-xl">
+              {user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email || '—'}
+            </p>
           </div>
           <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>

@@ -6,22 +6,27 @@ import { Button } from '../components/ui/Button';
 import { StatusBadge, PriorityBadge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { leadsApi, leadNotesApi } from '../api/leads';
+import { leadsApi, leadNotesApi, leadSourcesApi } from '../api/leads';
 import { followupsApi } from '../api/followups';
 import { activityApi } from '../api/activity';
-import type { Lead, LeadNote, FollowUp, ActivityLog } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import type { Lead, LeadSource, LeadNote, FollowUp, ActivityLog } from '../types';
 
 export function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isExecutive } = useAuth();
   const [lead, setLead] = useState<Lead | null>(null);
   const [notes, setNotes] = useState<LeadNote[]>([]);
   const [followups, setFollowups] = useState<FollowUp[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [sources, setSources] = useState<LeadSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'notes' | 'followups' | 'activity'>('notes');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteForm, setNoteForm] = useState({ note_text: '', note_type: 'CALL' });
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Lead>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -30,13 +35,34 @@ export function LeadDetailPage() {
       leadNotesApi.list(),
       followupsApi.list(),
       activityApi.list(),
-    ]).then(([l, n, f, a]) => {
+      leadSourcesApi.list(),
+    ]).then(([l, n, f, a, s]) => {
       setLead(l.data);
       setNotes(n.data.filter((nt: LeadNote) => nt.lead === id));
       setFollowups(f.data.filter((fu: FollowUp) => fu.lead === id));
       setActivities(a.data.filter((act: ActivityLog) => act.entity_id === id || (act.new_value as Record<string, unknown>)?.lead_id === id));
+      setSources(s.data);
     }).finally(() => setLoading(false));
   }, [id]);
+
+  const handleUpdate = async () => {
+    if (!id) return;
+    const payload = { ...editForm };
+    if (isExecutive) {
+      delete payload.assigned_to;
+      delete payload.created_by;
+    }
+    await leadsApi.update(id, payload);
+    setShowEdit(false);
+    const res = await leadsApi.retrieve(id);
+    setLead(res.data);
+  };
+
+  const openEdit = () => {
+    if (!lead) return;
+    setEditForm(lead);
+    setShowEdit(true);
+  };
 
   const handleAddNote = async () => {
     if (!id) return;
@@ -61,7 +87,7 @@ export function LeadDetailPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Lead Information</h2>
-              <Button variant="ghost" size="sm"><Edit size={16} /></Button>
+              <Button variant="ghost" size="sm" onClick={openEdit}><Edit size={16} /></Button>
             </div>
           </CardHeader>
           <CardBody className="space-y-4">
@@ -182,6 +208,42 @@ export function LeadDetailPage() {
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="secondary" onClick={() => setShowNoteModal(false)}>Cancel</Button>
           <Button onClick={handleAddNote}>Add Note</Button>
+        </div>
+      </Modal>
+
+      <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Lead" size="lg">
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">First Name</label><input className="input-field" value={editForm.first_name || ''} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label><input className="input-field" value={editForm.last_name || ''} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input className="input-field" value={editForm.email || ''} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input className="input-field" value={editForm.phone || ''} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Company</label><input className="input-field" value={editForm.company || ''} onChange={(e) => setEditForm({ ...editForm, company: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label><input className="input-field" value={editForm.job_title || ''} onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })} /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+            <select className="input-field" value={editForm.source || ''} onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}>
+              <option value="">Select</option>
+              {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select className="input-field" value={editForm.status || ''} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as Lead['status'] })}>
+              {['NEW', 'CONTACTED', 'DEMO', 'NEGOTIATION', 'WON', 'LOST'].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+            <select className="input-field" value={editForm.priority || ''} onChange={(e) => setEditForm({ ...editForm, priority: e.target.value as Lead['priority'] })}>
+              {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">Value ($)</label><input type="number" className="input-field" value={editForm.estimated_value || ''} onChange={(e) => setEditForm({ ...editForm, estimated_value: e.target.value })} /></div>
+          <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Website</label><input className="input-field" value={editForm.website || ''} onChange={(e) => setEditForm({ ...editForm, website: e.target.value })} /></div>
+          {!isExecutive && lead && (
+            <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Assigned To (User ID)</label><input className="input-field" value={editForm.assigned_to || ''} onChange={(e) => setEditForm({ ...editForm, assigned_to: e.target.value })} placeholder="UUID of user" /></div>
+          )}
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={() => setShowEdit(false)}>Cancel</Button>
+          <Button onClick={handleUpdate}>Save Changes</Button>
         </div>
       </Modal>
     </div>

@@ -53,7 +53,12 @@ export function LeadsPage() {
 
   const handleUpdate = async () => {
     if (!showEdit) return;
-    await leadsApi.update(showEdit.id, formData);
+    const payload = { ...formData };
+    if (isExecutive) {
+      delete payload.assigned_to;
+      delete payload.created_by;
+    }
+    await leadsApi.update(showEdit.id, payload);
     setShowEdit(null);
     setFormData({});
     fetch();
