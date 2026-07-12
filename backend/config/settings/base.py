@@ -165,7 +165,7 @@ REST_FRAMEWORK = {
 
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "SalesFlow CRM API",
+    "TITLE": "CRM Tracker API",
     "DESCRIPTION": "Lead Management & CRM System",
     "VERSION": "1.0.0",
 }
